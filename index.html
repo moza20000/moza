@@ -375,6 +375,12 @@ button[onclick="openMozaMusic()"],button[onclick*="openMozaMusic"]{display:none!
 }
 </style>
 
+
+<style id="moza-student-only">
+/* Student portal: admin console is hosted separately at admin.html */
+#adminModal{display:none!important;visibility:hidden!important;pointer-events:none!important}
+</style>
+
 </head>
 
 <body class="pb-12">
@@ -410,7 +416,7 @@ button[onclick="openMozaMusic()"],button[onclick*="openMozaMusic"]{display:none!
 
 <div id="welcomeOverlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90">
 <div class="glass w-full max-w-md p-8 rounded-3xl relative text-center">
-<button onclick="openAdminModal()" class="absolute top-5 left-5 text-xs bg-indigo-500/20 text-indigo-300 px-3 py-2 rounded-xl">لوحة الأدمن</button>
+
 <h2 class="text-3xl font-black mb-2 mt-8">تسجيل الدخول 🔑</h2>
 <p class="text-sm text-slate-400 mb-6">أدخل بياناتك وكود الاختبار وكلمة السر</p>
 <div class="space-y-4 text-right">
@@ -517,6 +523,19 @@ button[onclick="openMozaMusic()"],button[onclick*="openMozaMusic"]{display:none!
 </div>
 
 <div id="adminPanelSection" class="flex-1 flex flex-col overflow-hidden hidden">
+
+
+<section id="mozaDeviceBackup" class="mx-3 mt-3 p-4 rounded-2xl" style="background:linear-gradient(135deg,#10243b,#10152c);border:1px solid #38bdf855">
+ <div class="flex flex-wrap items-center justify-between gap-3">
+  <div><p class="text-xs font-black text-sky-300">MOZA DATA VAULT</p><h3 class="text-lg font-black mt-1">نسخ احتياطي وتحكم من جهازك</h3><p class="text-xs text-slate-400 mt-1">نزّل نسخة JSON من بيانات المنصة إلى جهازك، أو استعد بيانات محددة من نسخة سابقة.</p></div>
+  <div class="flex flex-wrap gap-2">
+   <button type="button" id="mozaExportBackup" class="px-4 py-3 rounded-xl font-black text-sm" style="background:linear-gradient(135deg,#0284c7,#2563eb)"><i class="fa-solid fa-download ml-2"></i>تنزيل نسخة احتياطية</button>
+   <label class="px-4 py-3 rounded-xl font-black text-sm cursor-pointer" style="background:#334155"><i class="fa-solid fa-upload ml-2"></i>استعادة من الجهاز<input id="mozaImportBackup" type="file" accept="application/json,.json" hidden></label>
+  </div>
+ </div>
+ <p id="mozaBackupStatus" class="text-xs text-slate-300 mt-3" aria-live="polite">النسخة الاحتياطية تُحفظ على جهازك كملف JSON. الاستعادة تدمج المسارات المدعومة فقط ولا تمسح قاعدة البيانات بالكامل.</p>
+ <p class="text-[10px] text-amber-300 mt-2">تنبيه: يلزم تسجيل دخول بصلاحية مناسبة وقواعد Firebase تسمح بالقراءة/الكتابة. لا ترفع ملف النسخة الاحتياطية لأي شخص؛ قد يحتوي بيانات طلاب.</p>
+</section>
 
 <div class="admin-hero mx-3 mt-3 p-5 rounded-2xl flex flex-wrap justify-between items-center gap-3">
  <div><p class="text-[10px] text-indigo-300 font-bold tracking-widest">MOZA • ADMINISTRATION</p><h4 class="text-xl font-black mt-1">إدارة المنصة بوضوح وتحكم</h4><p class="text-xs text-slate-400 mt-1">كل أدواتك الأساسية ومتابعة نشاط المنصة في مكان واحد</p><span class="admin-owner-mark"><i class="fa-solid fa-crown"></i> OWNER ACCESS · MOZA</span></div>
@@ -924,6 +943,19 @@ const refs={
  activity:db.ref('app_activity_logs'),
  menus:db.ref('app_menu_choices')
 };
+
+
+// MOZA local backup: export the shared RTDB snapshot to this device.
+(function installMozaDeviceBackup(){
+ const allowed=['app_tokens_db','app_tf_questions','app_mc_questions','app_menu_choices','app_login_logs','app_activity_logs'];
+ const status=(m,ok=false)=>{const el=document.getElementById('mozaBackupStatus');if(el){el.textContent=m;el.style.color=ok?'#86efac':'#cbd5e1';}};
+ const download=(name,text)=>{const blob=new Blob([text],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);};
+ document.addEventListener('DOMContentLoaded',()=>{
+  const exp=document.getElementById('mozaExportBackup'),imp=document.getElementById('mozaImportBackup');
+  if(exp)exp.addEventListener('click',async()=>{exp.disabled=true;status('جارٍ قراءة البيانات من Firebase...');try{const snap=await db.ref('/').once('value');const data=snap.val()||{};const payload={format:'moza-rtdb-backup',version:1,projectId:firebaseConfig.projectId,createdAt:new Date().toISOString(),paths:{}};allowed.forEach(k=>{if(Object.prototype.hasOwnProperty.call(data,k))payload.paths[k]=data[k];});download('moza-backup-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json',JSON.stringify(payload,null,2));status('تم تنزيل النسخة الاحتياطية على جهازك. احتفظ بها في مكان آمن.',true);}catch(e){status('تعذر التنزيل: '+(e.message||'تحقق من تسجيل الدخول وصلاحيات Firebase.'));}finally{exp.disabled=false;}});
+  if(imp)imp.addEventListener('change',async()=>{const file=imp.files&&imp.files[0];if(!file)return;try{const raw=JSON.parse(await file.text());if(raw.format!=='moza-rtdb-backup'||!raw.paths||typeof raw.paths!=='object')throw new Error('ملف النسخة غير صالح.');const keys=allowed.filter(k=>Object.prototype.hasOwnProperty.call(raw.paths,k));if(!keys.length)throw new Error('لا توجد مسارات مدعومة داخل الملف.');const summary=keys.join('، ');if(!confirm('سيتم استعادة ودمج المسارات التالية في قاعدة البيانات المشتركة:\n'+summary+'\n\nقد تستبدل البيانات الموجودة في هذه المسارات. يُفضّل تنزيل نسخة جديدة أولاً. هل تريد المتابعة؟'))return;status('جارٍ استعادة البيانات...');const patch={};keys.forEach(k=>patch[k]=raw.paths[k]);await db.ref('/').update(patch);status('تمت الاستعادة بنجاح للمسارات المحددة.',true);}catch(e){status('فشلت الاستعادة: '+(e.message||'خطأ غير معروف'));}finally{imp.value='';}});
+ });
+})();
 
 const defaultTokens=[
  {name:"أحمد محمد علي",code:"1010",pass:"123",deviceId:""},
