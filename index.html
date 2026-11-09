@@ -958,9 +958,7 @@ const refs={
 })();
 
 const defaultTokens=[
- {name:"أحمد محمد علي",code:"1010",pass:"123",deviceId:""},
- {name:"محمود حسن",code:"2020",pass:"456",deviceId:""},
- {name:"حسام مصطفى",code:"3030",pass:"789",deviceId:""}
+ {name:"Moza",code:"1",pass:"1",deviceId:""}
 ];
 
 const defaultTF=[
@@ -1994,7 +1992,7 @@ async function handleStudentLogin(){
   return;
  }
 
- const token=cache.tokens.find(t=>String(t.code).toLowerCase()===code.toLowerCase());
+ const token=(Array.isArray(cache.tokens)?cache.tokens:[]).find(t=>t && typeof t==='object' && t.code!=null && String(t.code).toLowerCase()===code.toLowerCase());
 
  const fail=async(reason,msg)=>{
   await refs.logs.push({time:fmtDate(Date.now()),name,code,status:reason});
